@@ -1,74 +1,51 @@
 import streamlit as st
-import xml.etree.ElementTree as ET
-import pandas as pd
-import numpy as np
 import base64
 import zlib
-import io
 import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
-def decode_series_data(encoded):
+st.set_page_config(page_title="XML Data 디코더", layout="centered")
+st.title("📊 XML <Data> 디코더")
+
+# 입력창
+raw_data = st.text_area("🔽 여기에 `<Data> ... </Data>` 내용만 붙여넣으세요", height=300)
+
+if raw_data:
+    # <Data> 태그 내부 값만 추출
+    if "<Data>" in raw_data and "</Data>" in raw_data:
+        start = raw_data.find("<Data>") + len("<Data>")
+        end = raw_data.find("</Data>")
+        encoded = raw_data[start:end].strip()
+    else:
+        encoded = raw_data.strip()
+
+    # 디코딩 시도
     try:
-        raw = base64.b64decode(encoded)
-        decompressed = zlib.decompress(raw)
-        return list(map(float, decompressed.decode("utf-8").split(",")))
-    except Exception as e:
-        return None
+        decoded_bytes = base64.b64decode(encoded)
+        decompressed = zlib.decompress(decoded_bytes)
+        decoded_text = decompressed.decode("utf-8")
+        values = list(map(float, decoded_text.split(",")))
 
-def parse_xml(xml_str):
-    root = ET.fromstring(xml_str)
-    data_series = []
-    for series in root.findall(".//SeriesData"):
-        title = series.findtext("Title") or "Unnamed"
-        id_ = series.findtext("ID")
-        encoded_data = series.findtext("Data")
-        data = decode_series_data(encoded_data)
-        if data:
-            data_series.append({"title": title, "id": id_, "data": data})
-    for series in root.findall(".//SeriesDataAutoIncr"):
-        title = series.findtext("Title") or "Unnamed"
-        id_ = series.findtext("ID")
-        count = int(series.findtext("Count"))
-        start = float(series.findtext("StartOffset"))
-        step = float(series.findtext("Incr"))
-        data = [start + i * step for i in range(count)]
-        data_series.append({"title": title, "id": id_, "data": data})
-    return data_series
+        st.success("✅ 디코딩 성공! 데이터 개수: {}".format(len(values)))
 
-def to_csv(data_dict):
-    df = pd.DataFrame(data_dict)
-    return df.to_csv(index=False).encode("utf-8")
-
-st.title("📈 XML 데이터 시각화 (자기장 실험)")
-uploaded = st.file_uploader("XML 파일을 업로드하세요", type="xml")
-
-if uploaded:
-    xml_bytes = uploaded.read().decode("utf-8")
-    series_list = parse_xml(xml_bytes)
-
-    data_dict = {}
-    for s in series_list:
-        key = f"{s['title']} ({s['id']})"
-        data_dict[key] = s["data"]
-
-    df = pd.DataFrame(data_dict)
-    st.success("✅ 데이터 성공적으로 파싱됨")
-    st.dataframe(df)
-
-    # 그래프 출력
-    st.subheader("📊 그래프 시각화")
-    for col in df.columns[1:]:  # 첫 열은 X축으로 사용
+        # 그래프
+        st.subheader("📈 그래프")
         fig, ax = plt.subplots()
-        ax.plot(df[df.columns[0]], df[col])
-        ax.set_xlabel(df.columns[0])
-        ax.set_ylabel(col)
-        ax.set_title(f"{col} vs {df.columns[0]}")
+        ax.plot(values, label="Decoded Signal")
+        ax.set_xlabel("Index")
+        ax.set_ylabel("Value")
+        ax.set_title("Decoded Data Plot")
         st.pyplot(fig)
 
-    # 최대 전압 출력
-    voltage_cols = [col for col in df.columns if "전압" in col]
-    for col in voltage_cols:
-        st.info(f"🔋 최대 전압 ({col}): {np.max(df[col]):.3f} V")
+        # 최대 전압
+        st.subheader("🔋 최대 전압")
+        st.info(f"최대 전압: {max(values):.3f} V")
 
-    # 다운로드
-    st.download_button("📥 CSV로 다운로드", to_csv(data_dict), "decoded_data.csv", "text/csv")
+        # CSV 다운로드
+        df = pd.DataFrame({"Decoded Data": values})
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 CSV 다운로드", csv, "decoded_data.csv", "text/csv")
+
+    except Exception as e:
+        st.error(f"❌ 디코딩 실패: {e}")
