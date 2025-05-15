@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 
 st.set_page_config(page_title="📈 XML 데이터 시각화", layout="centered")
-st.title("📄 XML `<SeriesData>` 기반 그래프 추출기")
+st.title("📄 XML 실험 회차별 그래프 추출기")
 
 xml_text = st.text_area("🔽 XML 전체 텍스트를 붙여넣으세요", height=400)
 
@@ -20,9 +20,9 @@ if xml_text.strip():
 
         for idx, s in enumerate(series_list):
             try:
-                title = s.findtext("Title") or f"Unnamed{idx+1}"
-                digit = s.findtext("Digit") or "?"
-                label = f"[{digit}자리] {title}"
+                title = s.findtext("Title") or "Unnamed"
+                round_num = idx // 3 + 1  # 3개씩 묶기
+                label = f"{round_num}회차: {title}"
 
                 encoded = s.findtext("Data").strip()
                 decoded = base64.b64decode(encoded)
@@ -50,7 +50,7 @@ if xml_text.strip():
                 st.download_button(
                     label=f"🖼️ 그래프 다운로드 (PNG, {label})",
                     data=buf.getvalue(),
-                    file_name=f"graph_{idx+1}.png",
+                    file_name=f"graph_{round_num}_{title}.png",
                     mime="image/png"
                 )
 
@@ -58,9 +58,9 @@ if xml_text.strip():
                 df = pd.DataFrame({"Index": x_vals, "Value": y_vals})
                 csv = df.to_csv(index=False).encode("utf-8")
                 st.download_button(
-                    label=f"📥 CSV 다운로드 (그래프 {idx+1})",
+                    label=f"📥 CSV 다운로드 ({label})",
                     data=csv,
-                    file_name=f"data_{idx+1}.csv",
+                    file_name=f"data_{round_num}_{title}.csv",
                     mime="text/csv"
                 )
             except Exception as e:
