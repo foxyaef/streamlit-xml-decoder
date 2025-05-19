@@ -29,7 +29,7 @@ if xml_text.strip():
                 y_vals = np.frombuffer(decoded, dtype=np.float32)
                 x_vals = np.arange(len(y_vals))
 
-                max_val = np.max(y_vals)
+                max_val = np.max(np.abs(y_vals))
 
                 # Plot
                 st.subheader(f"📊 {label}")
